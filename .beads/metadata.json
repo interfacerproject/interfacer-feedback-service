@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "interfacer_feedback_service",
+  "project_id": "fcabc05f-cbcb-4e36-b119-76eba4dcf9ea"
+}
