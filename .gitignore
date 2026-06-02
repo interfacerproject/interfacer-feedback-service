@@ -4,3 +4,9 @@
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Built binary
+feedback-server
+
+# SQLite data directory
+data/
