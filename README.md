@@ -101,7 +101,7 @@ interfacer-feedback-service/
 │   ├── events/
 │   │   └── events.go         # Event publisher interface + RatingUpdatedEvent schema
 │   ├── handler/
-│   │   ├── reviews.go        # POST/GET reviews, GET review summary
+│   │   ├── reviews.go        # POST/GET/DELETE reviews, GET review summary, GET user's review
 │   │   └── comments.go       # POST/GET/DELETE comments
 │   └── model/
 │       └── model.go          # Data structures: Review, ReviewSummary, Comment
@@ -230,6 +230,7 @@ This service uses the same DID-based EdDSA authentication flow as **interfacer-d
 |---------------|:---:|---|
 | `GET` (all) | No | Public read access |
 | `POST /reviews` | Yes | Any authenticated user; `UNIQUE(project_ulid, user_ulid)` limits one review per project |
+| `DELETE /reviews/:id` | Yes | Must match review's `user_ulid` (author-only); returns 403 on mismatch |
 | `POST /comments` | Yes | Any authenticated user |
 | `DELETE /comments/:id` | Yes | Must match comment's `user_ulid` (author-only); returns 403 on mismatch |
 
@@ -258,8 +259,10 @@ http://localhost:8081
 | `POST` | `/api/v1/projects/{project_ulid}/reviews` | Yes | Create or update a review |
 | `GET` | `/api/v1/projects/{project_ulid}/reviews` | No | List reviews (paginated) |
 | `GET` | `/api/v1/projects/{project_ulid}/reviews/summary` | No | Get aggregated review stats |
+| `GET` | `/api/v1/projects/{project_ulid}/reviews/mine` | No* | Get the current user's review (null if none) |
 | `POST` | `/api/v1/projects/{project_ulid}/comments` | Yes | Create a comment or reply |
 | `GET` | `/api/v1/projects/{project_ulid}/comments` | No | List comments (paginated, threaded) |
+| `DELETE` | `/api/v1/reviews/{review_id}` | Yes | Delete a review (author-only) |
 | `DELETE` | `/api/v1/comments/{comment_id}` | Yes | Soft-delete a comment (author-only) |
 
 ### GET /reviews — Query Parameters
@@ -299,6 +302,54 @@ Response:
     "4": 4,
     "5": 5
   }
+}
+```
+
+### GET /reviews/mine — Response
+
+Returns the authenticated user's review for the project, or `null` if none exists.
+
+Requires the `x-user-id` header. If not present, returns `{"review": null}`.
+
+Response (review exists):
+```json
+{
+  "review": {
+    "id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+    "project_ulid": "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+    "user_ulid": "01ARZ3NDEKTSV4RRFFQ69G5FAC",
+    "rating": 4,
+    "content": "Great project with excellent documentation!",
+    "created_at": "2025-01-15T10:30:00Z",
+    "updated_at": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
+Response (no review):
+```json
+{
+  "review": null
+}
+```
+
+### DELETE /reviews/{review_id}
+
+Permanently deletes a review. Only the review author can delete their own review.
+
+Auth headers (`did-sign`, `did-pk`, `x-user-id`) are required.
+
+Response:
+```json
+{
+  "status": "deleted"
+}
+```
+
+Error (not the author):
+```json
+{
+  "error": "review not found or not owned by user"
 }
 ```
 
@@ -348,7 +399,7 @@ All error responses follow the interfacer-dpp convention:
 | `201 Created` | Successful POST operation |
 | `400 Bad Request` | Invalid request format, missing fields, or rating out of range |
 | `401 Unauthorized` | Missing or invalid authentication headers |
-| `403 Forbidden` | Attempted to delete another user's comment |
+| `403 Forbidden` | Attempted to delete another user's review or comment |
 | `404 Not Found` | Resource not found |
 | `500 Internal Server Error` | Server-side error |
 
