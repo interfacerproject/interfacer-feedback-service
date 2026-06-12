@@ -48,6 +48,8 @@ func main() {
 	router.POST("/api/v1/projects/:project_ulid/reviews", authMW, handler.CreateReview(db, publisher))
 	router.GET("/api/v1/projects/:project_ulid/reviews", handler.GetReviews(db))
 	router.GET("/api/v1/projects/:project_ulid/reviews/summary", handler.GetReviewSummary(db))
+	router.GET("/api/v1/projects/:project_ulid/reviews/mine", handler.GetUserReview(db))
+	router.DELETE("/api/v1/reviews/:review_id", authMW, handler.DeleteReview(db, publisher))
 
 	// Phase 4: Comments
 	router.POST("/api/v1/projects/:project_ulid/comments", authMW, handler.CreateComment(db))

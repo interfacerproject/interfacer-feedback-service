@@ -112,6 +112,46 @@ func GetReviewsByProject(db *sql.DB, projectULID string, limit int, cursor *int6
 	return reviews, rows.Err()
 }
 
+// DeleteReview removes a review by ID. Only the author (userULID) can delete.
+func DeleteReview(db *sql.DB, reviewID string, userULID string) error {
+	result, err := db.Exec(`
+		DELETE FROM reviews WHERE id = ? AND user_ulid = ?
+	`, reviewID, userULID)
+	if err != nil {
+		return fmt.Errorf("delete review: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("review not found or not owned by user")
+	}
+
+	return nil
+}
+
+// GetUserReview returns the review by a specific user for a project, or nil if none exists.
+func GetUserReview(db *sql.DB, projectULID string, userULID string) (*model.Review, error) {
+	var r model.Review
+	var createdAt, updatedAt int64
+
+	err := db.QueryRow(`
+		SELECT id, project_ulid, user_ulid, rating, content, created_at, updated_at
+		FROM reviews
+		WHERE project_ulid = ? AND user_ulid = ?
+	`, projectULID, userULID).Scan(&r.ID, &r.ProjectULID, &r.UserULID, &r.Rating, &r.Content, &createdAt, &updatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get user review: %w", err)
+	}
+
+	r.CreatedAt = time.Unix(createdAt, 0).UTC()
+	r.UpdatedAt = time.Unix(updatedAt, 0).UTC()
+
+	return &r, nil
+}
+
 // GetReviewSummary returns aggregated stats for a project's reviews.
 func GetReviewSummary(db *sql.DB, projectULID string) (*model.ReviewSummary, error) {
 	var avgRating sql.NullFloat64

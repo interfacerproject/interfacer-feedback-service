@@ -88,6 +88,49 @@ func GetReviews(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+// DeleteReview handles DELETE /api/v1/reviews/:review_id (auth required).
+// Only the review author can delete their own review.
+func DeleteReview(db *sql.DB, publisher events.Publisher) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		reviewID := c.Param("review_id")
+		userULID := c.GetString("user_ulid")
+
+		if err := database.DeleteReview(db, reviewID, userULID); err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
+	}
+}
+
+// GetUserReview handles GET /api/v1/projects/:project_ulid/reviews/mine (requires x-user-id header).
+// Returns the current user's review for the project, or nil if none exists.
+func GetUserReview(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		projectULID := c.Param("project_ulid")
+		userULID := c.GetHeader("x-user-id")
+
+		if userULID == "" {
+			c.JSON(http.StatusOK, gin.H{"review": nil})
+			return
+		}
+
+		review, err := database.GetUserReview(db, projectULID, userULID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user review", "details": err.Error()})
+			return
+		}
+
+		if review == nil {
+			c.JSON(http.StatusOK, gin.H{"review": nil})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"review": review})
+	}
+}
+
 // GetReviewSummary handles GET /api/v1/projects/:project_ulid/reviews/summary (public).
 func GetReviewSummary(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
