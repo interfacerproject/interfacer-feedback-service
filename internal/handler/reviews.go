@@ -109,6 +109,12 @@ func DeleteReview(db *sql.DB, publisher events.Publisher) gin.HandlerFunc {
 func GetUserReview(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		projectULID := c.Param("project_ulid")
+		// Scope note: this read trusts the self-asserted x-user-id. That is
+		// deliberate for now — reviews are world-readable (a public GET
+		// /reviews exists), so spoofing the header yields only already-public
+		// data and no write. Writes prove the subject via the PDP
+		// (AuthzMiddleware). If /mine ever returns non-public fields, this must
+		// move to a proven subject too.
 		userULID := c.GetHeader("x-user-id")
 
 		if userULID == "" {

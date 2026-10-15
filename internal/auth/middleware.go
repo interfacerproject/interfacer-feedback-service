@@ -10,9 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AuthMiddleware verifies DID-based EdDSA signatures for write endpoints.
-// Skips auth for GET and OPTIONS requests (public reads, CORS preflight).
-// On success, sets "user_ulid" in the Gin context from the x-user-id header.
+// AuthMiddleware verifies DID-based EdDSA signatures for write endpoints —
+// the authentication floor (401). Skips auth for GET and OPTIONS requests
+// (public reads, CORS preflight). It does NOT set "user_ulid": the acting
+// subject is proven and set by AuthzMiddleware from the PDP, never from the
+// self-asserted x-user-id header.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip auth for public read endpoints and CORS preflight
