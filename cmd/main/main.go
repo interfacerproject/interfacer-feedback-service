@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/interfacerproject/interfacer-feedback-service/internal/auth"
+	"github.com/interfacerproject/interfacer-feedback-service/internal/authz"
 	"github.com/interfacerproject/interfacer-feedback-service/internal/database"
 	"github.com/interfacerproject/interfacer-feedback-service/internal/events"
 	"github.com/interfacerproject/interfacer-feedback-service/internal/handler"
@@ -40,21 +41,24 @@ func main() {
 
 	// Auth middleware for write endpoints
 	authMW := auth.AuthMiddleware()
+	// Authorization: prove the acting subject via the Zenflows PDP.
+	pdp := authz.NewClientFromEnv()
+	az := func(action string) gin.HandlerFunc { return auth.AuthzMiddleware(pdp, action) }
 
 	// Phase 3: Reviews
 	// Event publisher (in-process; replace with broker impl when ready)
 	publisher := &events.LogPublisher{}
 
-	router.POST("/api/v1/projects/:project_ulid/reviews", authMW, handler.CreateReview(db, publisher))
+	router.POST("/api/v1/projects/:project_ulid/reviews", authMW, az("feedback.review.create"), handler.CreateReview(db, publisher))
 	router.GET("/api/v1/projects/:project_ulid/reviews", handler.GetReviews(db))
 	router.GET("/api/v1/projects/:project_ulid/reviews/summary", handler.GetReviewSummary(db))
 	router.GET("/api/v1/projects/:project_ulid/reviews/mine", handler.GetUserReview(db))
-	router.DELETE("/api/v1/reviews/:review_id", authMW, handler.DeleteReview(db, publisher))
+	router.DELETE("/api/v1/reviews/:review_id", authMW, az("feedback.review.delete"), handler.DeleteReview(db, publisher))
 
 	// Phase 4: Comments
-	router.POST("/api/v1/projects/:project_ulid/comments", authMW, handler.CreateComment(db))
+	router.POST("/api/v1/projects/:project_ulid/comments", authMW, az("feedback.comment.create"), handler.CreateComment(db))
 	router.GET("/api/v1/projects/:project_ulid/comments", handler.GetComments(db))
-	router.DELETE("/api/v1/comments/:comment_id", authMW, handler.DeleteComment(db))
+	router.DELETE("/api/v1/comments/:comment_id", authMW, az("feedback.comment.delete"), handler.DeleteComment(db))
 
 	// TODO: Phase 5 - Event publishing
 

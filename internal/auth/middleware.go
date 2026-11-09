@@ -10,9 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AuthMiddleware verifies DID-based EdDSA signatures for write endpoints.
-// Skips auth for GET and OPTIONS requests (public reads, CORS preflight).
-// On success, sets "user_ulid" in the Gin context from the x-user-id header.
+// AuthMiddleware verifies DID-based EdDSA signatures for write endpoints —
+// the authentication floor (401). Skips auth for GET and OPTIONS requests
+// (public reads, CORS preflight). It does NOT set "user_ulid": the acting
+// subject is proven and set by AuthzMiddleware from the PDP, never from the
+// self-asserted x-user-id header.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip auth for public read endpoints and CORS preflight
@@ -36,20 +38,11 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Extract auth headers
 		signature := c.Request.Header.Get("did-sign")
 		publicKey := c.Request.Header.Get("did-pk")
-		userULID := c.Request.Header.Get("x-user-id")
 
 		if signature == "" || publicKey == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error":   "Authentication failed",
 				"details": "Missing authentication headers (did-sign, did-pk)",
-			})
-			return
-		}
-
-		if userULID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error":   "Authentication failed",
-				"details": "Missing x-user-id header",
 			})
 			return
 		}
@@ -81,9 +74,10 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Set user ULID in context for downstream handlers
-		c.Set("user_ulid", userULID)
-		log.Printf("Auth middleware: user %s authenticated successfully", userULID)
+		// Identity is proven and set downstream by AuthzMiddleware (from the
+		// PDP), not from the self-asserted x-user-id header. This middleware is
+		// only the signature authn floor (401).
+		log.Printf("Auth middleware: signature verified for pk %s", publicKey)
 		c.Next()
 	}
 }
