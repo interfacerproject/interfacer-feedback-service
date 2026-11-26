@@ -1,9 +1,5 @@
-
-# Beads / Dolt files (added by bd init)
-.dolt/
+# SQLite database files
 *.db
-.beads-credential-key
-.beads/proxieddb/
 
 # Built binary
 feedback-server
